@@ -1,4 +1,5 @@
 use crate::sample_range::SampleRange;
+use crate::processor::Processor;
 
 pub struct HardClipper{
     sample_range: SampleRange,
@@ -41,5 +42,11 @@ mod tests{
         assert!(HardClipper::new(SampleRange::new(16), -2.0).is_err());
         Ok(())
         // ceiling 0.5
+    }
+}
+
+impl Processor for HardClipper{
+    fn process(&self, sample: i32) -> i32{
+        self.apply(sample)
     }
 }

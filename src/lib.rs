@@ -6,4 +6,5 @@ pub mod sample_range;
 pub mod peak_detector;
 pub mod compressor;
 pub mod utility;
+pub mod processor;
 

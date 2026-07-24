@@ -6,14 +6,16 @@ mod distortion;
 mod compressor;
 mod peak_detector;
 mod utility;
+mod processor;
 
-use crate::gain::{Gain, GainProcessor};
+use crate::gain::Gain;
 use crate::peak_detector::PeakDetect;
 use crate::sample_range::SampleRange;
 use crate::distortion::HardClipper;
 use crate::wav::Wav;
 use crate::modulator::Fader;
 use crate::compressor::Compressor;
+use crate::processor::Processor;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -28,19 +30,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut wav = Wav::new(INPUT_PATH)?;
     // Peak analysis is a full read pass; use a separate reader for it.
-    let mut wav_for_peak = Wav::new(INPUT_PATH)?;
+    let mut wav_for_peak = Wav::new(
+        INPUT_PATH)?;
     let spec = wav.spec();
     let channels = wav.channels();
 
     let bits = wav.bits_per_sample();
-    let output = hound::WavWriter::create(OUTPUT_PATH, spec)?;
-    let smpl_rng = SampleRange::new(bits);
-    let total_frames: u32 = wav.audio().duration();
+    let output = hound::WavWriter::create(
+        OUTPUT_PATH, 
+        spec)?;
 
+    let smpl_rng = SampleRange::new(
+        bits);
 
-    let gain_processor = GainProcessor::new(smpl_rng);
+    let total_frames: u32 = wav
+        .audio()
+        .duration();
 
-    let mut fader = Fader::new(1.0, 0.0, total_frames, channels);
+    
+    let mut fader = Fader::new(
+        1.0, 
+        0.0, 
+        total_frames, channels);
 
     let comp = Compressor::new(
         smpl_rng, 
@@ -50,16 +61,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         5.0, 
         spec.sample_rate as f64 
     );
-    
-    println!("Computing peak...");
 
-    let peak = PeakDetect::new(&mut wav_for_peak)?;
-    println!("peak: {}\nnormalized_gain: {}", peak.peak(), peak.normalised_gain(smpl_rng)?);
-    let normalised_gain = peak.normalised_gain(smpl_rng)?;
+    let peak = PeakDetect::new(
+        &mut wav_for_peak)?;
 
-    let hard_clipper = HardClipper::new(smpl_rng, 0.2)?;
+    let normalised_gain = peak.normalised_gain(
+        smpl_rng
+    )?;
 
-    process_audio(wav, output, normalised_gain, gain_processor, &mut fader, hard_clipper, comp)
+    let gain_processor = Gain::new(
+        normalised_gain, 
+        smpl_rng);
+
+
+    let hard_clipper = HardClipper::new(
+        smpl_rng, 
+        0.1
+    )?;
+
+    process_audio(
+        wav, 
+        output, 
+        normalised_gain, 
+        gain_processor, 
+        &mut fader, 
+        hard_clipper, 
+        comp)
 
 }
     
@@ -67,9 +94,9 @@ fn process_audio(
     mut wav: Wav, 
     mut output: hound::WavWriter<std::io::BufWriter<std::fs::File>>,
     gain: f64, 
-    gain_processor: GainProcessor,
+    mut gain_processor: Gain,
     fader: &mut Fader,
-    clipper: HardClipper,
+    mut clipper: HardClipper,
     mut comp: Compressor,
 ) -> Result<(), Box<dyn std::error::Error>> {
         wav.audio()
@@ -78,16 +105,47 @@ fn process_audio(
                 |sample
                 | -> Result<(), Box<dyn std::error::Error>> {
 
-                    let sample: i32 = sample?;
-                    let processed_sample: i32 = gain_processor.apply_gain(sample, gain);
-                    let processed_sample: i32 = comp.apply(processed_sample);
-                    let processed_sample: i32 = gain_processor.apply_gain(processed_sample, gain);
-                    let processed_sample: i32 = gain_processor.apply_gain(processed_sample, fader.next_gain());
-                    let processed_sample: i32 = clipper.apply(processed_sample);
+                    let processed_sample: i32 = sample?;
+                    process_one(&mut gain_processor, processed_sample);    
+                    process_one(&mut clipper, processed_sample);
 
-                    output.write_sample(processed_sample)?;
+                    
+                   
+                    // let processed_sample: i32 = gain_processor
+                    //     .apply_gain(
+                    //         sample, 
+                    //         gain
+                    // );
+                    // let processed_sample: i32 = comp
+                    //     .apply(
+                    //         processed_sample
+                    // );
+                    // let processed_sample: i32 = gain_processor
+                    //     .apply_gain(
+                    //         processed_sample, 
+                    //         gain
+                    // );
+                    // let processed_sample: i32 = gain_processor
+                    //     .apply_gain(
+                    //         processed_sample, 
+                    //         fader.next_gain()
+                    // );
+                    // let processed_sample: i32 = clipper
+                    //     .apply(
+                    //         processed_sample
+                    // );
+                    output.write_sample(
+                        processed_sample
+                    )?;
                     Ok(())
         })?;
         output.finalize()?;
         Ok(())
+}
+
+fn process_one<P: Processor>(
+    processor: &mut P,
+    sample: i32,
+) -> i32 {
+    processor.process(sample)
 }
