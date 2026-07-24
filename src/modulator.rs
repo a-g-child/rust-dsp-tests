@@ -43,3 +43,20 @@ impl Fader {
 
 }
 
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+    fn fader_returns_same_gain_for_each_channel_in_frame() {
+        let mut fader = Fader::new(1.0,0.0,2,2);
+        let left1 = fader.next_gain();
+        let right1 = fader.next_gain();
+        let left2 = fader.next_gain();
+
+        assert_eq!(left1, right1);
+        assert_ne!(right1,left2);
+
+    }
+}
+

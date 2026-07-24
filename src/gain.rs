@@ -1,4 +1,3 @@
-use crate::wav::Wav;
 use crate::sample_range::SampleRange;
 pub struct Gain {
     value: f64,
@@ -30,10 +29,11 @@ impl GainProcessor {
             sample_range,
         }
     }
-    pub fn apply_gain(&self, sample: i32, gain: &Gain) -> i32 {
+    pub fn apply_gain(&self, sample: i32, gain: f64) -> i32 {
 
-        let scaled = (sample as f64) * gain.value();
+        let scaled = (sample as f64) * gain;
         scaled.clamp(self.sample_range.min_sample, self.sample_range.max_sample).round() as i32
     }
 }
+
 

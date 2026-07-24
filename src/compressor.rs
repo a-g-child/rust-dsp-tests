@@ -1,5 +1,8 @@
 use crate::sample_range::SampleRange;
-use crate::utility::Utility;
+use crate::utility::{
+    sample_to_amplitude,
+    amplitude_to_dbfs
+};
 
 pub struct Compressor {
     sample_range: SampleRange,
@@ -34,11 +37,11 @@ impl Compressor {
     }
     pub fn apply(&mut self, sample: i32) -> i32 {
         // Calculate the target reduction for this single sample
-        let target_reduction = self.calculate_gain_reduction(sample);
+        let target_reduction: f64 = self.calculate_gain_reduction(sample);
 
         // Determine if we are attacking (compressing more) or releasing (recovering)
         // Note: target_reduction is smaller when compression increases (e.g., 0.5 vs 1.0)
-        let coeff = if target_reduction < self.current_gain {
+        let coeff: f64 = if target_reduction < self.current_gain {
             self.attack_coeff
         } else {
             self.release_coeff
@@ -54,8 +57,8 @@ impl Compressor {
 
     // This remains a read-only mathematical helper
     pub fn calculate_gain_reduction(&self, sample: i32) -> f64 {
-        let amplitude: f64 = Utility::sample_to_amplitude(sample, self.sample_range);
-        let input_db: f64 = Utility::amplitude_to_dBFS(amplitude);
+        let amplitude: f64 = sample_to_amplitude(sample, self.sample_range);
+        let input_db: f64 = amplitude_to_dbfs(amplitude);
 
         if input_db > self.threshold {
             let excess_db: f64 = input_db - self.threshold;

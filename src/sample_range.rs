@@ -12,3 +12,17 @@ impl SampleRange{
         }
     }
 }
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+fn sample_range_for_16_bit_pcm() {
+    let range = SampleRange::new(16);
+    assert_eq!(range.max_sample, 32767.0);// i32:max = 32767 
+    assert_eq!(range.min_sample, -32768.0);// i32:min = -32768 
+    
+    
+}
+}
