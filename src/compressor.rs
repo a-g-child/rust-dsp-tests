@@ -1,9 +1,11 @@
 use crate::sample_range::SampleRange;
+use crate::processor::Processor;
 use crate::utility::{
     sample_to_amplitude,
     amplitude_to_dbfs
 };
 
+#[derive(Clone)]
 pub struct Compressor {
     sample_range: SampleRange,
     threshold: f64,
@@ -35,10 +37,21 @@ impl Compressor {
                 current_gain: 1.0, // Start with completely clean path
             }
     }
+    pub fn ratio(&self) -> f64{
+        self.ratio
+    }
+    pub fn set_ratio(&mut self, new_value: f64){
+        self.ratio = new_value;
+    }
+    pub fn threshold(&self) -> f64{
+        self.threshold
+    }
+    pub fn set_threshold(&mut self, new_value: f64){
+        self.threshold = new_value;
+    }
     pub fn apply(&mut self, sample: i32) -> i32 {
         // Calculate the target reduction for this single sample
         let target_reduction: f64 = self.calculate_gain_reduction(sample);
-
         // Determine if we are attacking (compressing more) or releasing (recovering)
         // Note: target_reduction is smaller when compression increases (e.g., 0.5 vs 1.0)
         let coeff: f64 = if target_reduction < self.current_gain {
@@ -46,28 +59,36 @@ impl Compressor {
         } else {
             self.release_coeff
         };
-
         // Smooth the envelope state (Exponential Moving Average filter)
         self.current_gain = coeff * self.current_gain + (1.0 - coeff) * target_reduction;
-
         // Multiply the original sample by the smoothed envelope state
         (sample as f64 * self.current_gain) as i32
     }
-
 
     // This remains a read-only mathematical helper
     pub fn calculate_gain_reduction(&self, sample: i32) -> f64 {
         let amplitude: f64 = sample_to_amplitude(sample, self.sample_range);
         let input_db: f64 = amplitude_to_dbfs(amplitude);
-
         if input_db > self.threshold {
             let excess_db: f64 = input_db - self.threshold;
             let compressed_db: f64 = self.threshold + (excess_db / self.ratio);
             let reduction_db: f64 = compressed_db - input_db; 
-            
             10.0f64.powf(reduction_db / 20.0)
         } else {
             1.0
         }
+    }
+}
+
+impl Processor for Compressor{
+    fn process(&mut self, sample: i32) -> i32{
+        
+        let i: i32 = self.apply(sample);
+        // if i < sample {
+        //     println!("sample: {}, compressed: {}", sample, i);
+        // } else{
+
+        // }
+        i
     }
 }

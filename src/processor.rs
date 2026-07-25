@@ -1,4 +1,4 @@
 pub trait Processor {
-    fn process(&self, sample: i32) -> i32;
+    fn process(&mut self, sample: i32) -> i32;
 
 }   

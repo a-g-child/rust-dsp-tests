@@ -49,7 +49,5 @@ mod test{
         
         Ok(())
         
-
-        // peak × gain ≈ max sample
     }
 }
