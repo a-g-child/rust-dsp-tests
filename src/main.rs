@@ -14,7 +14,7 @@ mod processor;
 use crate::gain::Gain;
 use crate::peak_detector::PeakDetect;
 use crate::sample_range::SampleRange;
-use crate::distortion::{HardClipper, SoftClipper};
+use crate::distortion::{HardClipper, SoftClipper, SoftClipperMode};
 use crate::wav::Wav;
 use crate::modulator::Fader;
 use crate::compressor::Compressor;
@@ -84,40 +84,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let sclipper = SoftClipper::new(
         smpl_rng,
-        0.2,
-        30.0,
-        0.4,
-        spec.sample_rate as f64,
+        SoftClipperMode::Logarithmic,
+        0.3,
+        200.0,
+        0.1,
     )?;
 
-    process_audio(
+    let chain: Vec<Box<dyn Processor>> = vec![
+    Box::new(gain_processor),
+    Box::new(sclipper),
+    Box::new(comp),
+];
+
+    process_audio( 
         wav, 
         output, 
-        normalised_gain, 
-        gain_processor, 
-        &mut fader, 
-        hard_clipper, 
-        comp,
-        sclipper,
+        chain,
     )
 
 }
     
 fn process_audio(
-    mut wav: Wav, 
-    mut output: hound::WavWriter<std::io::BufWriter<std::fs::File>>,
-    _gain: f64, 
-    gain_processor: Gain,
-    _fader: &mut Fader,
-    clipper: HardClipper,
-    comp: Compressor,
-    sclip: SoftClipper,
-) -> Result<(), Box<dyn std::error::Error>> {
-        let mut chain: Vec<Box<dyn Processor>> = Vec::new();
-        chain.push(Box::new(gain_processor));
-        chain.push(Box::new(sclip));
-        chain.push(Box::new(comp));
-
+    mut wav: Wav,
+    mut output: hound::WavWriter<
+        std::io::BufWriter<std::fs::File>,
+    >,
+    mut chain: Vec<Box<dyn Processor>>,
+) -> Result<(), Box<dyn std::error::Error>>{
         wav.audio()
             .samples::<i32>()
             .try_for_each(
@@ -157,8 +150,6 @@ mod test{
         chain.push(Box::new(clip));
         chain.push(Box::new(comp));
 
-        
-
         let mut first_processed_sample = 25000;
 
                     for processor in &mut chain {
@@ -173,7 +164,6 @@ mod test{
         chain.push(Box::new(clip));
         chain.push(Box::new(comp));
         chain.push(Box::new(gain));           
-
 
         let mut second_processed_sample = 25000;
 

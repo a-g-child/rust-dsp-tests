@@ -1,12 +1,13 @@
 
 use crate::sample_range::SampleRange;
 
-/// doesn't check if mix value is valid and this is to be used in hot looop,
+/// doesn't check if mix value is valid and this is to be used in hot loop,
 /// this needs to be assured outside of this function
 pub fn mixer(wet: i32, dry: i32, mix: f64) -> i32 {
-    // Mix based on wet_dry factor. 0 = original, 1 = processed.
-        let mix_amount = (wet - dry) as f64 * mix;
-        (dry as f64 + mix_amount) as i32
+    let wet = wet as f64;
+    let dry = dry as f64;
+
+    (dry + (wet - dry) * mix).round() as i32
 }
 
 pub fn milliseconds_from_coefficient(sample_rate: f64, coefficient: f64) -> f64{
