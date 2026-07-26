@@ -8,9 +8,6 @@ mod peak_detector;
 mod utility;
 mod processor;
 
-
-// use audio_lab_dsp::distortion::SoftClipper;
-
 use crate::gain::Gain;
 use crate::peak_detector::PeakDetect;
 use crate::sample_range::SampleRange;
@@ -24,12 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     const INPUT_PATH: &str = "audio/input.wav";
     const OUTPUT_PATH: &str = "audio/output1.wav";
-
-    // println!("Enter Gain value (e.g., 0.5 for half volume, 2.0 for double volume):");
-    
-    // let mut input = String::new();
-    // std::io::stdin().read_line(&mut input)?;
-    // let gain: f64 = input.trim().parse()?;  
+    const BLOCK_SIZE: usize = 256;
 
     let mut wav = Wav::new(INPUT_PATH)?;
     // Peak analysis is a full read pass; use a separate reader for it.
@@ -39,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let channels = wav.channels();
 
     let bits = wav.bits_per_sample();
-    let output = hound::WavWriter::create(
+    let mut output = hound::WavWriter::create(
         OUTPUT_PATH, 
         spec)?;
 
@@ -76,7 +68,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         normalised_gain, 
         smpl_rng);
 
-
     let hard_clipper = HardClipper::new(
         smpl_rng, 
         0.1
@@ -86,52 +77,63 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         smpl_rng,
         SoftClipperMode::Logarithmic,
         0.3,
-        200.0,
-        0.1,
+        20.0,
+        1.0,
     )?;
 
-    let chain: Vec<Box<dyn Processor>> = vec![
+    let mut chain: Vec<Box<dyn Processor>> = vec![
     Box::new(gain_processor),
-    Box::new(sclipper),
+    // Box::new(sclipper),
     Box::new(comp),
-];
+    ];
 
-    process_audio( 
-        wav, 
-        output, 
-        chain,
-    )
-
-}
+    let mut buffer: Vec<i32> = Vec::with_capacity(BLOCK_SIZE);
+    let mut blocks = 0;
     
-fn process_audio(
-    mut wav: Wav,
-    mut output: hound::WavWriter<
-        std::io::BufWriter<std::fs::File>,
-    >,
-    mut chain: Vec<Box<dyn Processor>>,
-) -> Result<(), Box<dyn std::error::Error>>{
-        wav.audio()
-            .samples::<i32>()
-            .try_for_each(
-                |sample
-                | -> Result<(), Box<dyn std::error::Error>> {
+    for sample in wav.audio().samples() {
 
-                    let mut processed_sample = sample?;
+        buffer.push(sample?);
+        
+        if buffer.len() == BLOCK_SIZE {
+            process_chain(&mut chain, &mut buffer);
 
-                    for processor in &mut chain {
-                        processed_sample =
-                            processor.process(processed_sample);
-                    }
+            for processed_sample in &buffer {
+                output.write_sample(*processed_sample)?;
+            }
+            buffer.clear();
+        }
+    }
+        if !buffer.is_empty() {
+        process_chain(&mut chain, &mut buffer);
+        
+        for processed_sample in &buffer {
+            output.write_sample(*processed_sample)?;
+        }
+        buffer.clear();
+    }
+    output.finalize()?;
 
-                    output.write_sample(
-                        processed_sample
-                    )?;
-                    Ok(())
-        })?;
-        output.finalize()?;
-        Ok(())
+    let mut slice = [0,1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    let iter = slice.chunks_exact_mut(2);
+    for e in iter{
+        println!("{:?}", e);
+    }
+    
+
+    Ok(())
+
 }
+
+fn process_chain(
+    chain: &mut [Box<dyn Processor>],
+    buffer: &mut [i32],
+) {
+    for processor in chain {
+        processor.process_buffer(buffer);
+    }
+}
+
 
 #[cfg(test)]
 mod test{

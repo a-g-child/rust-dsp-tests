@@ -35,4 +35,35 @@ impl Processor for Gain{
     }
 }
 
+#[cfg(test)]
+mod test{
+    use super::*;
+
+    #[test]
+    fn gain_processes_an_entire_buffer() {
+        let mut processor = Gain::new(2.0, SampleRange::new(16));
+
+        let i = processor.process(10);
+        assert_eq!(i,20);
+
+        let mut buffer = [
+            1_000,
+            -2_000,
+            3_000,
+            -4_000,
+        ];
+
+        processor.process_buffer(&mut buffer);
+
+        assert_eq!(
+            buffer,
+            [
+                2_000,
+                -4_000,
+                6_000,
+                -8_000,
+            ]);
+    }
+}
+
 

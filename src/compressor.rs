@@ -2,7 +2,8 @@ use crate::sample_range::SampleRange;
 use crate::processor::Processor;
 use crate::utility::{
     sample_to_amplitude,
-    amplitude_to_dbfs
+    amplitude_to_dbfs,
+    coefficient_from_milleseconds,
 };
 
 #[derive(Clone)]
@@ -25,8 +26,8 @@ impl Compressor {
         sample_rate: f64
     ) -> Self {
             // Standard digital filter coefficient calculation from milliseconds
-            let attack_coeff = (-1.0 / (sample_rate * (attack_ms / 1000.0))).exp();
-            let release_coeff = (-1.0 / (sample_rate * (release_ms / 1000.0))).exp();
+            let attack_coeff = coefficient_from_milleseconds(sample_rate, attack_ms);
+            let release_coeff = coefficient_from_milleseconds(sample_rate, release_ms);
 
             Self {
                 sample_range: range,
@@ -49,7 +50,8 @@ impl Compressor {
     pub fn set_threshold(&mut self, new_value: f64){
         self.threshold = new_value;
     }
-    pub fn apply(&mut self, sample: i32) -> i32 {
+    pub fn apply(&mut self, sample: i32, gain: f64) -> i32 {
+        
         // Calculate the target reduction for this single sample
         let target_reduction: f64 = self.calculate_gain_reduction(sample);
         // Determine if we are attacking (compressing more) or releasing (recovering)
@@ -62,9 +64,10 @@ impl Compressor {
         // Smooth the envelope state (Exponential Moving Average filter)
         self.current_gain = coeff * self.current_gain + (1.0 - coeff) * target_reduction;
         // Multiply the original sample by the smoothed envelope state
-        (sample as f64 * self.current_gain) as i32
+        let i = (sample as f64 * self.current_gain) as i32;
+        if target_reduction != 1.0 {println!("sample: {}, compressed: {}, target_reduction: {}", sample, i, target_reduction)};
+        i
     }
-
     // This remains a read-only mathematical helper
     pub fn calculate_gain_reduction(&self, sample: i32) -> f64 {
         let amplitude: f64 = sample_to_amplitude(sample, self.sample_range);
@@ -82,13 +85,19 @@ impl Compressor {
 
 impl Processor for Compressor{
     fn process(&mut self, sample: i32) -> i32{
-        
-        let i: i32 = self.apply(sample);
-        // if i < sample {
-        //     println!("sample: {}, compressed: {}", sample, i);
-        // } else{
+        self.apply(sample, self.current_gain)
+    }
+    // stereo compression which technically sidechains the average of left and right as the target reduction.
+    fn process_buffer(&mut self, buffer: &mut [i32]) {
+        for frame in buffer.chunks_exact_mut(2) {
+            let left = frame[0];
+            let right = frame[1];
 
-        // }
-        i
+            let average: i32 = (left as f64 + right as f64 / 2.0) as i32;
+            let target_reduction = self.calculate_gain_reduction(average);
+            self.apply(frame[0], target_reduction);
+            self.apply(frame[1], target_reduction);
+            
+        }
     }
 }
