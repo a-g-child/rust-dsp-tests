@@ -7,5 +7,4 @@ pub trait Processor {
             // println!("processing...")
         }
     }
-
-}   
+}

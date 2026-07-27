@@ -1,4 +1,3 @@
-
 pub struct Wav {
     audio: hound::WavReader<std::io::BufReader<std::fs::File>>,
     spec: hound::WavSpec,
@@ -31,10 +30,10 @@ impl Wav {
     pub fn channels(&self) -> u16 {
         self.channels
     }
-    pub fn samples_i32(&mut self) -> impl Iterator<Item = Result<i32, hound::Error>> + '_{
+    pub fn samples_i32(&mut self) -> impl Iterator<Item = Result<i32, hound::Error>> + '_ {
         self.audio.samples()
     }
     pub fn bits_per_sample(&self) -> u16 {
-            self.spec.bits_per_sample
-        }
+        self.spec.bits_per_sample
+    }
 }

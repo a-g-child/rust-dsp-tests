@@ -1,7 +1,7 @@
-use crate::sample_range::SampleRange;
 use crate::processor::Processor;
+use crate::sample_range::SampleRange;
 
-#[derive (Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct Gain {
     gain: f64,
     sample_range: SampleRange,
@@ -9,34 +9,31 @@ pub struct Gain {
 
 impl Gain {
     pub fn new(gain: f64, sample_range: SampleRange) -> Self {
-        
-        Self {
-            gain,
-            sample_range,
-        }
+        Self { gain, sample_range }
     }
-    pub fn gain(&self) ->f64{
+    pub fn gain(&self) -> f64 {
         self.gain
     }
-    pub fn set_gain(&mut self, new_value: f64){
+    pub fn set_gain(&mut self, new_value: f64) {
         self.gain = new_value;
     }
     pub fn apply_gain(&self, sample: i32, gain: f64) -> i32 {
-
         let scaled: f64 = (sample as f64) * gain;
-        scaled.clamp(self.sample_range.min_sample, self.sample_range.max_sample).round() as i32
+        scaled
+            .clamp(self.sample_range.min_sample, self.sample_range.max_sample)
+            .round() as i32
     }
 }
 
-impl Processor for Gain{
-    fn process(&mut self, sample: i32) -> i32{
+impl Processor for Gain {
+    fn process(&mut self, sample: i32) -> i32 {
         // println!("Gain::process({})", sample);
         self.apply_gain(sample, self.gain)
     }
 }
 
 #[cfg(test)]
-mod test{
+mod test {
     use super::*;
 
     #[test]
@@ -44,26 +41,12 @@ mod test{
         let mut processor = Gain::new(2.0, SampleRange::new(16));
 
         let i = processor.process(10);
-        assert_eq!(i,20);
+        assert_eq!(i, 20);
 
-        let mut buffer = [
-            1_000,
-            -2_000,
-            3_000,
-            -4_000,
-        ];
+        let mut buffer = [1_000, -2_000, 3_000, -4_000];
 
         processor.process_buffer(&mut buffer);
 
-        assert_eq!(
-            buffer,
-            [
-                2_000,
-                -4_000,
-                6_000,
-                -8_000,
-            ]);
+        assert_eq!(buffer, [2_000, -4_000, 6_000, -8_000,]);
     }
 }
-
-

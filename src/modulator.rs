@@ -8,17 +8,15 @@ pub struct Fader {
 }
 
 impl Fader {
-
     pub fn new(start: f64, end: f64, total_frames: u32, channels: u16) -> Self {
-        
-        Fader { 
-            start, 
-            end, 
-            total_frames, 
+        Fader {
+            start,
+            end,
+            total_frames,
             channels,
-            current_frame: 0, 
-            current_channel: 0, 
-            }
+            current_frame: 0,
+            current_channel: 0,
+        }
     }
 
     pub fn next_gain(&mut self) -> f64 {
@@ -40,23 +38,20 @@ impl Fader {
             self.current_frame += 1;
         }
     }
-
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
 
     #[test]
     fn fader_returns_same_gain_for_each_channel_in_frame() {
-        let mut fader = Fader::new(1.0,0.0,2,2);
+        let mut fader = Fader::new(1.0, 0.0, 2, 2);
         let left1 = fader.next_gain();
         let right1 = fader.next_gain();
         let left2 = fader.next_gain();
 
         assert_eq!(left1, right1);
-        assert_ne!(right1,left2);
-
+        assert_ne!(right1, left2);
     }
 }
-

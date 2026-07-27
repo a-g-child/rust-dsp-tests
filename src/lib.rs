@@ -1,12 +1,10 @@
-pub mod wav;
+pub mod compressor;
+pub mod delay;
+pub mod distortion;
 pub mod gain;
 pub mod modulator;
-pub mod distortion;
-pub mod sample_range;
 pub mod peak_detector;
-pub mod compressor;
-pub mod utility;
 pub mod processor;
-
-
-
+pub mod sample_range;
+pub mod utility;
+pub mod wav;
