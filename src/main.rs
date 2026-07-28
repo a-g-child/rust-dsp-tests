@@ -8,6 +8,7 @@ mod processor;
 mod sample_range;
 mod utility;
 mod wav;
+mod reverb;
 
 use crate::compressor::Compressor;
 use crate::delay::Delay;
@@ -18,9 +19,10 @@ use crate::peak_detector::PeakDetect;
 use crate::processor::Processor;
 use crate::sample_range::SampleRange;
 use crate::wav::Wav;
+use crate::reverb::Reverb;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const INPUT_PATH: &str = "audio/file.wav";
+    const INPUT_PATH: &str = "audio/ff.wav";
     const OUTPUT_PATH: &str = "audio/decay.wav";
     const BLOCK_SIZE: usize = 256;
 
@@ -60,16 +62,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sclipper = SoftClipper::new(smpl_rng, SoftClipperMode::Logarithmic, 0.3, 20.0, 1.0)?;
 
     let delay = Delay::new(
-        [50.0, 5.0], 
-        [12.0, 30.0], 
+        [1000.0, 3000.0], 
+        [0.99, 0.3], 
         [1.0, 1.0],
-        [0.5, 1.0], 
-        spec.sample_rate as f64);
+        44100.0,
+        SampleRange::new(16),
+
+    );
+
+    let reverb: Reverb = Reverb::new(
+        
+        4000.0, 
+        2000.0, 
+        [0.7, 0.7], 
+        [0.5, 0.5], 
+        16.0);
 
     let mut chain: Vec<Box<dyn Processor>> = vec![
-        Box::new(gain_processor),
+        // Box::new(gain_processor),
         // Box::new(sclipper),
-        Box::new(delay),
+        // Box::new(delay),
+        Box::new(reverb),
         // Box::new(comp),
     ];
 
