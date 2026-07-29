@@ -1,21 +1,35 @@
-pub struct Wav {
+use crate::sample_range::SampleRange;
+
+pub struct WavAudioContext {
     audio: hound::WavReader<std::io::BufReader<std::fs::File>>,
     spec: hound::WavSpec,
     channels: u16,
+    bit_depth: u16,
+    range: SampleRange,
     frames: u32,
 }
 
-impl Wav {
-    pub fn new(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let file = hound::WavReader::open(path)?;
-        let frames = file.len() as u32;
-        let spec = file.spec();
+impl WavAudioContext {
+    pub fn new(
+        input_path: &str
+) -> Result<Self, Box<dyn std::error::Error>> {
+        let input_file = 
+            hound::WavReader::open(input_path)?;
+        let audio_aux = 
+            hound::WavReader::open(input_path)?;
+        let spec = 
+            hound::WavReader::open(input_path)?.spec();
+        let frames = 
+            hound::WavReader::open(input_path)?.duration();
+        let bit_depth = input_file.spec().bits_per_sample;
 
         Ok(Self {
-            audio: file,
-            spec,
+            audio: input_file,
+            spec: spec,
             channels: spec.channels as u16,
-            frames: frames,
+            bit_depth: bit_depth,
+            range: SampleRange::new(bit_depth),
+            frames,
         })
     }
     pub fn audio(&mut self) -> &mut hound::WavReader<std::io::BufReader<std::fs::File>> {
@@ -30,7 +44,13 @@ impl Wav {
     pub fn channels(&self) -> u16 {
         self.channels
     }
-    pub fn samples_i32(&mut self) -> impl Iterator<Item = Result<i32, hound::Error>> + '_ {
+    pub fn range(&self) -> SampleRange{
+        self.range
+    }
+    pub fn sample_rate(&self) -> u32{
+        self.spec.sample_rate
+    }
+    pub fn samples(&mut self) -> impl Iterator<Item = Result<i32, hound::Error>> + '_ {
         self.audio.samples()
     }
     pub fn bits_per_sample(&self) -> u16 {

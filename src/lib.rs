@@ -8,3 +8,4 @@ pub mod processor;
 pub mod sample_range;
 pub mod utility;
 pub mod wav;
+pub mod reverb;

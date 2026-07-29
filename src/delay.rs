@@ -15,6 +15,7 @@ impl DelayLine {
     fn read(&self) -> f64 {
         self.buffer[self.position]
     }
+
     fn write_and_advance(&mut self, sample: f64) {
         self.buffer[self.position] = sample;
 
@@ -79,4 +80,3 @@ impl Processor for Delay {
         }
     }
 }
-

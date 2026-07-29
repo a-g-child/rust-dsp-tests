@@ -24,6 +24,39 @@ impl ReverbLine {
     fn read(&self) -> f64 {
         self.buffer[self.position]
     }
+        fn size(&self) -> usize{
+        self.buffer.len()
+    }
+    fn write_and_advance(&mut self, sample: f64) {
+        self.buffer[self.position] = sample;
+
+        self.position += 1;
+
+        if self.position == self.buffer.len() {
+            self.position = 0;
+        }
+    }
+}
+
+#[derive(Clone)]
+struct AllPassLine {
+    buffer: Vec<f64>,
+    position: usize,
+}
+
+impl AllPassLine {
+    fn new(size: usize) -> Self {
+        Self {
+            buffer: vec![0.0; size],
+            position: 0,
+        }
+    }
+    fn read(&self) -> f64 {
+        self.buffer[self.position]
+    }
+        fn size(&self) -> usize{
+        self.buffer.len()
+    }
     fn write_and_advance(&mut self, sample: f64) {
         self.buffer[self.position] = sample;
 
@@ -37,48 +70,86 @@ impl ReverbLine {
 
 pub struct Reverb {
     lines: [[ReverbLine; 10]; 2],
+    all_pass_lines: [[AllPassLine; 3];2],
     decay: [f64; 2],
     mix: [f64; 2],
-    bit_depth: f64,
+    
 }
 
 impl Reverb {
     pub fn new(
-        size: f64,
-        spread: f64, 
+        delay_ms: f64,
+        spread_ms: f64, 
         decay: [f64; 2], 
         mix: [f64; 2],
-        bit_depth: f64,) -> Self {
-
-            let size = size.max(1.0) as usize;
-            let spread = spread.max(0.0) as usize;
+        sample_rate: f64,
+    ) -> Self {
+        
+            let size = (delay_ms *sample_rate / 1000.0).max(1.0) as usize;
+            let spread = (spread_ms * sample_rate / 1000.0).max(0.0) as usize;
+            let all_pass_line1 = [
+                AllPassLine::new(220),
+                AllPassLine::new(70),
+                AllPassLine::new(30)
+            ];
+            let all_pass_line2 = [
+                AllPassLine::new(220),
+                AllPassLine::new(70),
+                AllPassLine::new(30)
+            ];
             let lines = std::array::from_fn(|_| {
                 std::array::from_fn(|_| ReverbLine::new(size, spread))
             });
 
             Self {
                 lines,
-                decay,
-                mix,
-                bit_depth,
+                all_pass_lines: [all_pass_line1,   all_pass_line2],
+                decay: [decay[0].clamp(0.0, 0.99), decay[1].clamp(0.0, 0.99)],
+                mix: [mix[0].clamp(0.0, 1.0), mix[1].clamp(0.0, 1.0)],
             }
     }
-    pub fn process_channel(&mut self, channel: usize, sample: i32) -> i32{
+    pub fn process_channel(
+        &mut self,
+        channel: usize,
+        sample: i32,
+    ) -> i32 {
 
-        let mut output: f64 = sample as f64;
+        let input = sample as f64;
+        let mut wet_sum = 0.0;
 
-        for line in self.lines[channel].iter_mut() {  
-            let reverb = line.read(); 
-            output = reverb + output * 0.5;
-                // mixer(reverb as i32, output, self.mix[channel]);
+        for line in &mut self.lines[channel] {
+            let delayed = line.read();
 
-            line.write_and_advance(sample as f64 * self.decay[channel]);
+            wet_sum += delayed;
 
+            let feedback_sample =
+                input
+                + delayed * self.decay[channel];
+
+            line.write_and_advance(feedback_sample);
         }
-        
-        let mix = mixer(output as i32 , sample, self.mix[channel]);
-        // println!("output: {}, input: {}, mix: {}", output, sample, mix);
-        mix
+
+        let wet =
+            wet_sum / self.lines[channel].len() as f64;
+
+        for line in &mut self.all_pass_lines[channel]{
+            let delayed = line.read();
+
+            wet_sum += delayed;
+            wet_sum /= 2.0;
+
+            let feedback_sample =
+                input
+                + delayed * self.decay[channel];
+
+            line.write_and_advance(feedback_sample);
+        }
+
+        mixer(
+            wet.round() as i32,
+            sample,
+            self.mix[channel],
+        )
     }
 
 }
@@ -97,6 +168,53 @@ impl Processor for Reverb {
             frame[0] = l;
             frame[1] = r;
         }
+    }
+}
+
+
+#[cfg(test)]
+mod test{
+    use super::*;
+
+    #[test]
+    fn reverb_line(){
+        let mut line = ReverbLine {
+            buffer: vec![0.0; 3],
+            position: 0,
+        };
+
+        let impulse = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut output = Vec::with_capacity(impulse.len());
+
+        for segment in impulse {
+            let delayed = line.read();
+            output.push(delayed);
+
+            let feedback_sample = segment + delayed * 0.5;
+            line.write_and_advance(feedback_sample);
+        }
+
+        assert_eq!(output, [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5]);
+    }
+
+    #[test]
+    fn silence_stays_silent(){
+        let mut reverb = Reverb::new(1.0, 0.0, [0.5, 0.5], [1.0, 1.0], 1000.0);
+        let mut buffer = [0, 0, 0, 0, 0, 0, 0, 0];
+
+        reverb.process_buffer(&mut buffer);
+
+        assert_eq!(buffer, [0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn impulse_produces_late_output(){
+        let mut reverb = Reverb::new(1.0, 0.0, [0.5, 0.5], [1.0, 1.0], 1000.0);
+        let mut buffer = [1, 0, 0, 0, 0, 0, 0, 0];
+
+        reverb.process_buffer(&mut buffer);
+
+        assert!(buffer[2..].iter().any(|&sample| sample != 0));
     }
 }
 

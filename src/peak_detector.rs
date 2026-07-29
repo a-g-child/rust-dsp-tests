@@ -1,14 +1,16 @@
 use crate::sample_range::SampleRange;
-use crate::wav::Wav;
+use crate::wav::WavAudioContext;
 
 pub struct PeakDetect {
     peak: i64,
 }
 
 impl PeakDetect {
-    pub fn new(wav: &mut Wav) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        wav: &mut WavAudioContext
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut p = 0;
-        wav.audio()
+        wav
             .samples()
             .try_for_each(|sample| -> Result<(), Box<dyn std::error::Error>> {
                 let sample: i32 = sample?;
@@ -42,7 +44,7 @@ mod test {
 
     #[test]
     fn normalised_gain_maps_peak_to_full_scale() -> Result<(), Box<dyn std::error::Error>> {
-        let mut wav = Wav::new("audio/input.wav")?;
+        let mut wav = WavAudioContext::new("audio/input.wav")?;
         let mut p = PeakDetect::new(&mut wav)?;
 
         let n = p.normalised_gain(SampleRange::new(16))?;
