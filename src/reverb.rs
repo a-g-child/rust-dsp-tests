@@ -1,6 +1,6 @@
-use rand::RngExt;
 use crate::processor::Processor;
 use crate::utility::mixer;
+use rand::RngExt;
 
 #[derive(Clone)]
 struct ReverbLine {
@@ -24,7 +24,7 @@ impl ReverbLine {
     fn read(&self) -> f64 {
         self.buffer[self.position]
     }
-        fn size(&self) -> usize{
+    fn size(&self) -> usize {
         self.buffer.len()
     }
     fn write_and_advance(&mut self, sample: f64) {
@@ -54,7 +54,7 @@ impl AllPassLine {
     fn read(&self) -> f64 {
         self.buffer[self.position]
     }
-        fn size(&self) -> usize{
+    fn size(&self) -> usize {
         self.buffer.len()
     }
     fn write_and_advance(&mut self, sample: f64) {
@@ -70,50 +70,41 @@ impl AllPassLine {
 
 pub struct Reverb {
     lines: [[ReverbLine; 10]; 2],
-    all_pass_lines: [[AllPassLine; 3];2],
+    all_pass_lines: [[AllPassLine; 3]; 2],
     decay: [f64; 2],
     mix: [f64; 2],
-    
 }
 
 impl Reverb {
     pub fn new(
         delay_ms: f64,
-        spread_ms: f64, 
-        decay: [f64; 2], 
+        spread_ms: f64,
+        decay: [f64; 2],
         mix: [f64; 2],
         sample_rate: f64,
     ) -> Self {
-        
-            let size = (delay_ms *sample_rate / 1000.0).max(1.0) as usize;
-            let spread = (spread_ms * sample_rate / 1000.0).max(0.0) as usize;
-            let all_pass_line1 = [
-                AllPassLine::new(220),
-                AllPassLine::new(70),
-                AllPassLine::new(30)
-            ];
-            let all_pass_line2 = [
-                AllPassLine::new(220),
-                AllPassLine::new(70),
-                AllPassLine::new(30)
-            ];
-            let lines = std::array::from_fn(|_| {
-                std::array::from_fn(|_| ReverbLine::new(size, spread))
-            });
+        let size = (delay_ms * sample_rate / 1000.0).max(1.0) as usize;
+        let spread = (spread_ms * sample_rate / 1000.0).max(0.0) as usize;
+        let all_pass_line1 = [
+            AllPassLine::new(220),
+            AllPassLine::new(70),
+            AllPassLine::new(30),
+        ];
+        let all_pass_line2 = [
+            AllPassLine::new(220),
+            AllPassLine::new(70),
+            AllPassLine::new(30),
+        ];
+        let lines = std::array::from_fn(|_| std::array::from_fn(|_| ReverbLine::new(size, spread)));
 
-            Self {
-                lines,
-                all_pass_lines: [all_pass_line1,   all_pass_line2],
-                decay: [decay[0].clamp(0.0, 0.99), decay[1].clamp(0.0, 0.99)],
-                mix: [mix[0].clamp(0.0, 1.0), mix[1].clamp(0.0, 1.0)],
-            }
+        Self {
+            lines,
+            all_pass_lines: [all_pass_line1, all_pass_line2],
+            decay: [decay[0].clamp(0.0, 0.99), decay[1].clamp(0.0, 0.99)],
+            mix: [mix[0].clamp(0.0, 1.0), mix[1].clamp(0.0, 1.0)],
+        }
     }
-    pub fn process_channel(
-        &mut self,
-        channel: usize,
-        sample: i32,
-    ) -> i32 {
-
+    pub fn process_channel(&mut self, channel: usize, sample: i32) -> i32 {
         let input = sample as f64;
         let mut wet_sum = 0.0;
 
@@ -122,36 +113,26 @@ impl Reverb {
 
             wet_sum += delayed;
 
-            let feedback_sample =
-                input
-                + delayed * self.decay[channel];
+            let feedback_sample = input + delayed * self.decay[channel];
 
             line.write_and_advance(feedback_sample);
         }
 
-        let wet =
-            wet_sum / self.lines[channel].len() as f64;
+        let wet = wet_sum / self.lines[channel].len() as f64;
 
-        for line in &mut self.all_pass_lines[channel]{
+        for line in &mut self.all_pass_lines[channel] {
             let delayed = line.read();
 
             wet_sum += delayed;
             wet_sum /= 2.0;
 
-            let feedback_sample =
-                input
-                + delayed * self.decay[channel];
+            let feedback_sample = input + delayed * self.decay[channel];
 
             line.write_and_advance(feedback_sample);
         }
 
-        mixer(
-            wet.round() as i32,
-            sample,
-            self.mix[channel],
-        )
+        mixer(wet.round() as i32, sample, self.mix[channel])
     }
-
 }
 
 impl Processor for Reverb {
@@ -160,7 +141,6 @@ impl Processor for Reverb {
     }
     fn process_buffer(&mut self, buffer: &mut [i32]) {
         for frame in buffer.chunks_exact_mut(2) {
-
             let left = frame[0];
             let right = frame[1];
             let l = self.process_channel(0, left);
@@ -171,13 +151,12 @@ impl Processor for Reverb {
     }
 }
 
-
 #[cfg(test)]
-mod test{
+mod test {
     use super::*;
 
     #[test]
-    fn reverb_line(){
+    fn reverb_line() {
         let mut line = ReverbLine {
             buffer: vec![0.0; 3],
             position: 0,
@@ -198,7 +177,7 @@ mod test{
     }
 
     #[test]
-    fn silence_stays_silent(){
+    fn silence_stays_silent() {
         let mut reverb = Reverb::new(1.0, 0.0, [0.5, 0.5], [1.0, 1.0], 1000.0);
         let mut buffer = [0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -208,7 +187,7 @@ mod test{
     }
 
     #[test]
-    fn impulse_produces_late_output(){
+    fn impulse_produces_late_output() {
         let mut reverb = Reverb::new(1.0, 0.0, [0.5, 0.5], [1.0, 1.0], 1000.0);
         let mut buffer = [1, 0, 0, 0, 0, 0, 0, 0];
 
@@ -217,4 +196,3 @@ mod test{
         assert!(buffer[2..].iter().any(|&sample| sample != 0));
     }
 }
-

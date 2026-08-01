@@ -9,7 +9,9 @@ mod sample_range;
 mod utility;
 mod wav;
 mod reverb;
+mod wav_renderer;
 
+use crate::wav_renderer::WavRenderer;
 use crate::compressor::Compressor;
 use crate::delay::Delay;
 use crate::distortion::{HardClipper, SoftClipper, SoftClipperMode};
@@ -25,21 +27,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     const BLOCK_SIZE: usize = 256;
 
-    let mut wav = 
+    let wav = 
         WavAudioContext::new(
             "audio/input.wav")?;
 
-    let mut aux = 
+    let aux = 
         WavAudioContext::new(
             "audio/input.wav")?;
-    
-    let mut output = 
-        hound::WavWriter::create(
-            "audio/out.wav", 
-            wav.spec()
-        )?;
 
-    let (_delay, 
+    let (delay, 
         reverb, 
         _comp, 
         gain_processor, 
@@ -53,98 +49,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             wav.range(), 
             wav.frames())?;
 
-    let mut chain: Vec<Box<dyn Processor>> = vec![
-        Box::new(gain_processor),
+    let chain: Vec<Box<dyn Processor>> = vec![
+        // Box::new(gain_processor),
         // Box::new(sclipper),
-        // Box::new(delay),
+        Box::new(delay),
         Box::new(reverb),
         // Box::new(comp),
     ];
 
-    let mut buffer: Vec<i32> = Vec::with_capacity(BLOCK_SIZE);
-
-    for sample in wav.samples() {
-        buffer.push(sample?);
-
-        if buffer.len() == BLOCK_SIZE {
-            process_chain(&mut chain, &mut buffer);
-
-            for processed_sample in &buffer {
-                output.write_sample(*processed_sample)?;
-            }
-            buffer.clear();
-        }
-    }
-    if !buffer.is_empty() {
-        process_chain(&mut chain, &mut buffer);
-
-        for processed_sample in &buffer {
-            output.write_sample(*processed_sample)?;
-        }
-        // println!("{:#?}", buffer.len() % 2);
-        buffer.clear();
-    }
-
-    const BLOCK_FRAMES: usize = 128;
-    const SILENCE_THRESHOLD: i32 = 10;
-    const SILENT_BLOCKS_REQUIRED: usize = 20;
-    const MAX_TAIL_SECONDS: f64 = 20.0;
-    const MIN_TAIL_SECONDS: f64 = 1.0;
-    
-    let max_tail_frames =
-        (wav.sample_rate() as f64
-            * MAX_TAIL_SECONDS)
-            .round() as usize;
-
-    let mut rendered_frames = 0;
-    let mut silent_blocks = 0;
-
-    let minimum_tail_frames =
-            (wav.sample_rate() as f64 * MIN_TAIL_SECONDS).round() as usize;
-
-    while rendered_frames < max_tail_frames {
-        let remaining =
-            max_tail_frames - rendered_frames;
-        // tracks number of frames and returns minimum of 128 if the actual value is less     
-        let frames_this_block =
-            remaining.min(BLOCK_FRAMES);
-        // 2 channels
-        let samples_this_block =
-            frames_this_block * wav.channels() as usize;
-        
-        // creates full block to accomodate samples
-        let mut tail_buffer =
-            vec![0_i32; samples_this_block];
-        
-        process_chain(
-            &mut chain,
-            &mut tail_buffer,
-        );
-
-        let peak = block_peak(&tail_buffer);
-
-        for sample in &tail_buffer {
-            output.write_sample(*sample)?;
-        }
-
-        rendered_frames += frames_this_block;
-
-        if peak <= SILENCE_THRESHOLD  {
-            silent_blocks += 1;
-        } else {
-            silent_blocks = 0;
-        }
-
-        if rendered_frames >= minimum_tail_frames
-            && silent_blocks >= SILENT_BLOCKS_REQUIRED
-        {
-            break;
-        }
-    }
-
-    output.finalize()?;
-
-    
+    let renderer = WavRenderer::new(wav, "audio/wav_render.wav", chain, BLOCK_SIZE)?;
+    renderer.render()?;
 
     Ok(())
 }
@@ -203,7 +117,7 @@ fn initialise_processors(
 
         );
         let reverb: Reverb = Reverb::new(
-            100.0, 
+            200.0, 
             50.0,
             [0.6, 0.6], 
             [0.5, 0.5],

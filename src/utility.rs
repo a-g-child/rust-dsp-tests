@@ -8,7 +8,7 @@ pub fn mixer(wet: i32, dry: i32, mix: f64) -> i32 {
 
     (dry + (wet - dry) * mix).round() as i32
 }
-pub fn clamp_to_bit_depth(sample: f64, range: SampleRange) -> f64{
+pub fn clamp_to_bit_depth(sample: f64, range: SampleRange) -> f64 {
     sample.clamp(range.min_sample, range.max_sample)
 }
 #[allow(dead_code)]

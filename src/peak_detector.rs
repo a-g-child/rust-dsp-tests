@@ -6,12 +6,9 @@ pub struct PeakDetect {
 }
 
 impl PeakDetect {
-    pub fn new(
-        wav: &mut WavAudioContext
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(wav: &mut WavAudioContext) -> Result<Self, Box<dyn std::error::Error>> {
         let mut p = 0;
-        wav
-            .samples()
+        wav.samples()
             .try_for_each(|sample| -> Result<(), Box<dyn std::error::Error>> {
                 let sample: i32 = sample?;
                 let magnitude = i64::from(sample).abs();
