@@ -42,7 +42,7 @@ mod test {
     #[test]
     fn normalised_gain_maps_peak_to_full_scale() -> Result<(), Box<dyn std::error::Error>> {
         let mut wav = WavAudioContext::new("audio/input.wav")?;
-        let mut p = PeakDetect::new(&mut wav)?;
+        let p = PeakDetect::new(&mut wav)?;
 
         let n = p.normalised_gain(SampleRange::new(16))?;
 

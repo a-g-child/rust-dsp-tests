@@ -1,5 +1,4 @@
 use crate::sample_range::SampleRange;
-
 /// doesn't check if mix value is valid and this is to be used in hot loop,
 /// this needs to be assured outside of this function
 pub fn mixer(wet: i32, dry: i32, mix: f64) -> i32 {
@@ -8,6 +7,7 @@ pub fn mixer(wet: i32, dry: i32, mix: f64) -> i32 {
 
     (dry + (wet - dry) * mix).round() as i32
 }
+
 pub fn clamp_to_bit_depth(sample: f64, range: SampleRange) -> f64 {
     sample.clamp(range.min_sample, range.max_sample)
 }

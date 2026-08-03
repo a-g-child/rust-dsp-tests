@@ -1,6 +1,31 @@
+use crate::parameter::{ParameterError, ParameterId, ParameterInfo};
 use crate::processor::Processor;
 use crate::utility::mixer;
 use rand::RngExt;
+
+const REVERB_PARAMETERS: [ParameterInfo; 3] = [
+    ParameterInfo {
+        id: ParameterId::Size,
+        name: "size",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Spread,
+        name: "spread",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Feedback,
+        name: "feedback",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+];
 
 #[derive(Clone)]
 struct ReverbLine {
@@ -123,8 +148,8 @@ impl Reverb {
         for line in &mut self.all_pass_lines[channel] {
             let delayed = line.read();
 
-            wet_sum += delayed;
-            wet_sum /= 2.0;
+            // wet_sum += delayed;
+            // wet_sum /= 2.0;
 
             let feedback_sample = input + delayed * self.decay[channel];
 
@@ -149,6 +174,18 @@ impl Processor for Reverb {
             frame[1] = r;
         }
     }
+    fn parameters(&self) -> &[ParameterInfo]{
+        &REVERB_PARAMETERS
+    }
+    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
+        Some(0.0)
+    }
+
+    fn set_parameter(&mut self, id: ParameterId, value: f64,) -> Result<(), ParameterError> {
+        Ok(())
+    }
+
+    
 }
 
 #[cfg(test)]

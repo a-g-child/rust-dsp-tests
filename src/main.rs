@@ -3,6 +3,7 @@ mod delay;
 mod distortion;
 mod gain;
 mod modulator;
+mod parameter;
 mod peak_detector;
 mod processor;
 mod sample_range;
@@ -99,7 +100,8 @@ fn initialise_processors(
             smpl_rng);
         let hard_clipper = HardClipper::new(
             smpl_rng, 
-            0.1
+            0.1,
+            0.5
         )?;
         let soft_clip = SoftClipper::new(
             smpl_rng, 
@@ -148,7 +150,7 @@ mod test {
     fn processor_chain_runs_in_order() -> Result<(), Box<dyn std::error::Error>> {
         let range = SampleRange::new(16);
         let gain = Gain::new(2.0, range);
-        let clip = HardClipper::new(range, 0.5)?;
+        let clip = HardClipper::new(range, 0.5, 0.5)?;
         let comp = Compressor::new(range, -6.0, 20.0, 2.0, 2.0, 1.0, 44100.0);
 
         let mut chain: Vec<Box<dyn Processor>> = Vec::new();
@@ -162,7 +164,7 @@ mod test {
             first_processed_sample = processor.process(first_processed_sample);
         }
 
-        let clip = HardClipper::new(range, 0.5)?;
+        let clip = HardClipper::new(range, 0.5, 0.5)?;
         let comp = Compressor::new(range, -6.0, 20.0, 2.0, 2.0, 1.0, 44100.0);
 
         chain.clear();

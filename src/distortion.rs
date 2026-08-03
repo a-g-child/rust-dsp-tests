@@ -1,16 +1,68 @@
+use crate::parameter::{ParameterError, ParameterId, ParameterInfo, validate_parameter};
 use crate::processor::Processor;
 use crate::sample_range::SampleRange;
 use crate::utility::mixer;
+
+const HARDCLIP_PARAMETERS: [ParameterInfo; 2] = [
+    ParameterInfo {
+        id: ParameterId::Ceiling,
+        name: "ceiling",
+        min: 0.0,
+        max: 1.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Mix,
+        name: "mix",
+        min: 0.0,
+        max: 1.0,
+        default: 0.5,
+    },
+];
+
+const SOFTCLIP_PARAMETERS: [ParameterInfo; 3] = [
+    // mode require option list
+    // ParameterInfo {
+    //     id: ParameterId::Mode,
+    //     name: "Mode",
+    //     min: 0.0,
+    //     max: 1.0,
+    //     default: 1.0,
+    // },
+    ParameterInfo {
+        id: ParameterId::Threshold,
+        name: "threshold",
+        min: 0.0,
+        max: 1.0,
+        default: 0.5,
+    },
+    ParameterInfo {
+        id: ParameterId::Mix,
+        name: "mix",
+        min: 0.0,
+        max: 1.0,
+        default: 0.5,
+    },
+    ParameterInfo {
+        id: ParameterId::Mix,
+        name: "mix",
+        min: 0.0,
+        max: 1.0,
+        default: 0.5,
+    },
+];
 
 #[derive(Clone)]
 pub struct HardClipper {
     sample_range: SampleRange,
     ceiling: f64,
+    mix: f64,
 }
 impl HardClipper {
     pub fn new(
         sample_range: SampleRange,
         ceiling: f64,
+        mix: f64,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         if !(0.0..=1.0).contains(&ceiling) {
             return Err("Clipping ceiling must be between 0.0 and 1.0".into());
@@ -18,6 +70,7 @@ impl HardClipper {
             Ok(Self {
                 sample_range,
                 ceiling,
+                mix: mix.clamp(0.0, 1.0),
             })
         }
     }
@@ -32,7 +85,8 @@ impl HardClipper {
     pub fn apply(&self, sample: i32) -> i32 {
         let upper = self.sample_range.max_sample * self.ceiling;
         let lower = self.sample_range.min_sample * self.ceiling;
-        (sample as f64).clamp(lower, upper).round() as i32
+        let wet =(sample as f64).clamp(lower, upper).round() as i32;
+        mixer(wet, sample, self.mix)
     }
 }
 
@@ -105,8 +159,8 @@ impl SoftClipper {
         let sign = sample.signum();
         let abs_input = sample.abs();
         // Formula: sign(x) * ln(1 + drive * |x|) / ln(1 + drive)
-        let wet = ((sign * ((1.0 + self.drive * abs_input).ln()) / (1.0 + self.drive).ln())
-            * self.sample_range.min_sample.abs());
+        let wet = sign * ((1.0 + self.drive * abs_input).ln()) / (1.0 + self.drive).ln()
+            * self.sample_range.min_sample.abs();
         mixer(wet.round() as i32, s, self.mix)
     }
     /// Piecewise band soft clipper
@@ -147,6 +201,44 @@ impl Processor for HardClipper {
     fn process(&mut self, sample: i32) -> i32 {
         self.apply(sample)
     }
+        fn parameters(&self) -> &[ParameterInfo]{
+        &HARDCLIP_PARAMETERS
+    }
+    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
+        match id {
+            ParameterId::Ceiling => Some(self.ceiling),
+            ParameterId::Mix => Some(self.mix),
+            _ => None,
+        }
+    }
+
+    fn set_parameter(
+        &mut self,
+        id: ParameterId,
+        value: f64,
+    ) -> Result<(), ParameterError> {
+        match id {
+            ParameterId::Ceiling => {
+                let info: &ParameterInfo = &HARDCLIP_PARAMETERS[0];
+                
+                validate_parameter(id, value, info)?;
+
+                self.ceiling = value;
+                Ok(())
+            }
+            ParameterId::Mix => {
+                let info: &ParameterInfo = &HARDCLIP_PARAMETERS[1];
+                
+                validate_parameter(id, value, info)?;
+
+                self.mix = value;
+                Ok(())
+            }
+            _ => Err(
+                ParameterError::UnknownParameter(id),
+            ),
+        }
+    }
 }
 
 impl Processor for SoftClipper {
@@ -154,6 +246,53 @@ impl Processor for SoftClipper {
         match self.mode {
             SoftClipperMode::Logarithmic => self.apply_logarithmic(sample),
             SoftClipperMode::CubicBand => self.apply_band(sample),
+        }
+    }
+    fn parameters(&self) -> &[ParameterInfo]{
+        &SOFTCLIP_PARAMETERS
+    }
+    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
+        match id {
+            ParameterId::Threshold => Some(self.threshold),
+            ParameterId::Drive => Some(self.drive),
+            ParameterId::Mix => Some(self.mix),
+            _ => None,
+        }
+    }
+
+    fn set_parameter(
+        &mut self,
+        id: ParameterId,
+        value: f64,
+    ) -> Result<(), ParameterError> {
+        match id {
+            ParameterId::Threshold => {
+                let info: &ParameterInfo = &SOFTCLIP_PARAMETERS[0];
+                
+                validate_parameter(id, value, info)?;
+
+                self.threshold = value;
+                Ok(())
+            }
+            ParameterId::Drive => {
+                let info: &ParameterInfo = &SOFTCLIP_PARAMETERS[1];
+                
+                validate_parameter(id, value, info)?;
+
+                self.drive = value;
+                Ok(())
+            }
+            ParameterId::Mix => {
+                let info: &ParameterInfo = &SOFTCLIP_PARAMETERS[2];
+                
+                validate_parameter(id, value, info)?;
+
+                self.mix = value;
+                Ok(())
+            }
+            _ => Err(
+                ParameterError::UnknownParameter(id),
+            ),
         }
     }
 }
@@ -165,11 +304,11 @@ mod tests {
     #[test]
     fn hard_clipper_limits_positive_and_negative_samples() -> Result<(), Box<dyn std::error::Error>>
     {
-        let clip = HardClipper::new(SampleRange::new(16), 0.5)?;
+        let clip = HardClipper::new(SampleRange::new(16), 0.5, 1.0)?;
         assert_eq!(clip.apply(30000), 16384); // 32767 / 2 = 16383.5 rounded to 16384
         assert_eq!(clip.apply(-30000), -16384); // -32768 / 2 = -16384
-        assert!(HardClipper::new(SampleRange::new(16), 2.0).is_err());
-        assert!(HardClipper::new(SampleRange::new(16), -2.0).is_err());
+        assert!(HardClipper::new(SampleRange::new(16), 2.0, 0.5).is_err());
+        assert!(HardClipper::new(SampleRange::new(16), -2.0, 0.5).is_err());
         Ok(())
     }
 

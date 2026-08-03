@@ -1,8 +1,48 @@
+use crate::parameter::{ParameterId, ParameterInfo, ParameterError};
 use crate::processor::Processor;
 use crate::sample_range::SampleRange;
 use crate::utility::{
     amplitude_to_dbfs, coefficient_from_milleseconds, mixer, sample_to_amplitude,
 };
+
+const COMPRESSOR_PARAMETERS: [ParameterInfo; 5] = [
+    ParameterInfo {
+        id: ParameterId::Ratio,
+        name: "ratio",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Attack,
+        name: "attack",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Release,
+        name: "release",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Threshold,
+        name: "threshold",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    ParameterInfo {
+        id: ParameterId::Mix,
+        name: "mix",
+        min: 0.0,
+        max: 4.0,
+        default: 1.0,
+    },
+    
+];
 
 #[derive(Clone)]
 pub struct Compressor {
@@ -130,5 +170,15 @@ impl Processor for Compressor {
             frame[0] = self.apply_current_gain(left);
             frame[1] = self.apply_current_gain(right);
         }
+    }
+    fn parameters(&self) -> &[ParameterInfo]{
+        &COMPRESSOR_PARAMETERS
+    }
+    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
+        Some(0.0)
+    }
+
+    fn set_parameter(&mut self, id: ParameterId, value: f64,) -> Result<(), ParameterError> {
+        Ok(())
     }
 }
