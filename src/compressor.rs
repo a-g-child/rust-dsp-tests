@@ -1,4 +1,4 @@
-use crate::parameter::{ParameterId, ParameterInfo, ParameterError};
+use crate::parameter::{ParameterAddress, ParameterError, ParameterId, ParameterInfo, ParameterScope};
 use crate::processor::Processor;
 use crate::sample_range::SampleRange;
 use crate::utility::{
@@ -12,6 +12,7 @@ const COMPRESSOR_PARAMETERS: [ParameterInfo; 5] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Attack,
@@ -19,6 +20,7 @@ const COMPRESSOR_PARAMETERS: [ParameterInfo; 5] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Release,
@@ -26,6 +28,7 @@ const COMPRESSOR_PARAMETERS: [ParameterInfo; 5] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Threshold,
@@ -33,6 +36,7 @@ const COMPRESSOR_PARAMETERS: [ParameterInfo; 5] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Mix,
@@ -40,6 +44,7 @@ const COMPRESSOR_PARAMETERS: [ParameterInfo; 5] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     
 ];
@@ -174,11 +179,11 @@ impl Processor for Compressor {
     fn parameters(&self) -> &[ParameterInfo]{
         &COMPRESSOR_PARAMETERS
     }
-    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
-        Some(0.0)
+    fn get_parameter(&self, address: ParameterAddress) -> Result<Option<f64>,ParameterError>{
+        Ok(Some(0.0))
     }
 
-    fn set_parameter(&mut self, id: ParameterId, value: f64,) -> Result<(), ParameterError> {
+    fn set_parameter(&mut self, address: ParameterAddress, value: f64,) -> Result<(), ParameterError> {
         Ok(())
     }
 }

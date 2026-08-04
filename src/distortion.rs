@@ -1,4 +1,4 @@
-use crate::parameter::{ParameterError, ParameterId, ParameterInfo, validate_parameter};
+use crate::parameter::{ParameterAddress, ParameterError, ParameterId, ParameterInfo, ParameterScope, validate_channel_exists, validate_has_channels, validate_parameter};
 use crate::processor::Processor;
 use crate::sample_range::SampleRange;
 use crate::utility::mixer;
@@ -10,6 +10,7 @@ const HARDCLIP_PARAMETERS: [ParameterInfo; 2] = [
         min: 0.0,
         max: 1.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Mix,
@@ -17,6 +18,7 @@ const HARDCLIP_PARAMETERS: [ParameterInfo; 2] = [
         min: 0.0,
         max: 1.0,
         default: 0.5,
+        scope: ParameterScope::Global,
     },
 ];
 
@@ -35,6 +37,7 @@ const SOFTCLIP_PARAMETERS: [ParameterInfo; 3] = [
         min: 0.0,
         max: 1.0,
         default: 0.5,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Mix,
@@ -42,6 +45,7 @@ const SOFTCLIP_PARAMETERS: [ParameterInfo; 3] = [
         min: 0.0,
         max: 1.0,
         default: 0.5,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Mix,
@@ -49,6 +53,7 @@ const SOFTCLIP_PARAMETERS: [ParameterInfo; 3] = [
         min: 0.0,
         max: 1.0,
         default: 0.5,
+        scope: ParameterScope::Global,
     },
 ];
 
@@ -204,38 +209,36 @@ impl Processor for HardClipper {
         fn parameters(&self) -> &[ParameterInfo]{
         &HARDCLIP_PARAMETERS
     }
-    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
-        match id {
-            ParameterId::Ceiling => Some(self.ceiling),
-            ParameterId::Mix => Some(self.mix),
-            _ => None,
+    fn get_parameter(&self, address: ParameterAddress) -> Result<Option<f64>, ParameterError>{
+        match address.id {
+            ParameterId::Ceiling => Ok(Some(self.ceiling)),
+            ParameterId::Mix => Ok(Some(self.mix)),
+            _ => Ok(None),
         }
     }
 
     fn set_parameter(
         &mut self,
-        id: ParameterId,
+        address: ParameterAddress,
         value: f64,
     ) -> Result<(), ParameterError> {
-        match id {
+        match address.id {
             ParameterId::Ceiling => {
                 let info: &ParameterInfo = &HARDCLIP_PARAMETERS[0];
-                
-                validate_parameter(id, value, info)?;
-
+                validate_parameter(address.id, value, info)?;
                 self.ceiling = value;
                 Ok(())
             }
             ParameterId::Mix => {
                 let info: &ParameterInfo = &HARDCLIP_PARAMETERS[1];
                 
-                validate_parameter(id, value, info)?;
+                validate_parameter(address.id, value, info)?;
 
                 self.mix = value;
                 Ok(())
             }
             _ => Err(
-                ParameterError::UnknownParameter(id),
+                ParameterError::UnknownParameter(address.id),
             ),
         }
     }
@@ -251,25 +254,25 @@ impl Processor for SoftClipper {
     fn parameters(&self) -> &[ParameterInfo]{
         &SOFTCLIP_PARAMETERS
     }
-    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
-        match id {
-            ParameterId::Threshold => Some(self.threshold),
-            ParameterId::Drive => Some(self.drive),
-            ParameterId::Mix => Some(self.mix),
-            _ => None,
+    fn get_parameter(&self, address: ParameterAddress) -> Result<Option<f64>, ParameterError>{
+        match address.id {
+            ParameterId::Threshold => Ok(Some(self.threshold)),
+            ParameterId::Drive => Ok(Some(self.drive)),
+            ParameterId::Mix => Ok(Some(self.mix)),
+            _ => Ok(None),
         }
     }
 
     fn set_parameter(
         &mut self,
-        id: ParameterId,
+        address: ParameterAddress,
         value: f64,
     ) -> Result<(), ParameterError> {
-        match id {
+        match address.id {
             ParameterId::Threshold => {
                 let info: &ParameterInfo = &SOFTCLIP_PARAMETERS[0];
                 
-                validate_parameter(id, value, info)?;
+                validate_parameter(address.id, value, info)?;
 
                 self.threshold = value;
                 Ok(())
@@ -277,7 +280,7 @@ impl Processor for SoftClipper {
             ParameterId::Drive => {
                 let info: &ParameterInfo = &SOFTCLIP_PARAMETERS[1];
                 
-                validate_parameter(id, value, info)?;
+                validate_parameter(address.id, value, info)?;
 
                 self.drive = value;
                 Ok(())
@@ -285,13 +288,13 @@ impl Processor for SoftClipper {
             ParameterId::Mix => {
                 let info: &ParameterInfo = &SOFTCLIP_PARAMETERS[2];
                 
-                validate_parameter(id, value, info)?;
+                validate_parameter(address.id, value, info)?;
 
                 self.mix = value;
                 Ok(())
             }
             _ => Err(
-                ParameterError::UnknownParameter(id),
+                ParameterError::UnknownParameter(address.id),
             ),
         }
     }

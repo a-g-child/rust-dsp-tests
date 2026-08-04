@@ -1,4 +1,4 @@
-use crate::parameter::{ParameterId, ParameterInfo, ParameterError};
+use crate::parameter::{ParameterId, ParameterInfo, ParameterError, ParameterAddress};
 
 pub trait Processor {
     fn process(&mut self, sample: i32) -> i32;
@@ -12,11 +12,11 @@ pub trait Processor {
 
     fn parameters(&self) -> &[ParameterInfo];
 
-    fn get_parameter(&self, id: ParameterId) -> Option<f64>;
+    fn get_parameter(&self, address: ParameterAddress) -> Result<Option<f64>, ParameterError>;
 
     fn set_parameter(
         &mut self,
-        id: ParameterId,
+        address: ParameterAddress,
         value: f64,
     ) -> Result<(), ParameterError>;
 }

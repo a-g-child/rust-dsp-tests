@@ -1,50 +1,45 @@
 use crate::{
-    processor::Processor, sample_range::SampleRange, utility::clamp_to_bit_depth, utility::mixer,
+    processor::Processor, 
+    sample_range::SampleRange, 
+    utility::clamp_to_bit_depth, 
+    utility::mixer,
 };
-use crate::parameter::{ParameterId, ParameterInfo, ParameterError, validate_parameter};
+use crate::parameter::{
+    ParameterAddress, 
+    ParameterError, 
+    ParameterId, 
+    ParameterInfo, 
+    ParameterScope, 
+    ParameterTarget, 
+    validate_parameter, 
+    validate_channel_exists,
+    validate_has_channels,
+};
 
-const DELAY_PARAMETERS: [ParameterInfo; 6] = [
+const DELAY_PARAMETERS: [ParameterInfo; 3] = [
     ParameterInfo {
         id: ParameterId::DelayTime,
-        name: "time_left",
+        name: "delay_time",
         min: 0.0,
         max: 10000.0,
-        default: 300.0,
-    },
-    ParameterInfo {
-        id: ParameterId::DelayTime,
-        name: "time_right",
-        min: 0.0,
-        max: 10000.0,
-        default: 300.0,
+        default: 250.0,
+        scope: ParameterScope::PerChannel,
     },
     ParameterInfo {
         id: ParameterId::Feedback,
-        name: "feedback_left",
+        name: "feedback",
         min: 0.0,
-        max: 0.99,
+    max: 0.99,
         default: 0.5,
-    },
-    ParameterInfo {
-        id: ParameterId::Feedback,
-        name: "feedback_right",
-        min: 0.0,
-        max: 0.99,
-        default: 0.5,
+        scope: ParameterScope::PerChannel,
     },
     ParameterInfo {
         id: ParameterId::Mix,
-        name: "mix_left",
+        name: "mix",
         min: 0.0,
         max: 1.0,
         default: 0.5,
-    },
-    ParameterInfo {
-        id: ParameterId::Mix,
-        name: "mix_right",
-        min: 0.0,
-        max: 1.0,
-        default: 0.5,
+        scope: ParameterScope::PerChannel,
     },
 ];
 
@@ -108,9 +103,13 @@ impl Delay {
         let delayed = self.lines[channel].read();
         let output = inp + delayed * self.mix[channel];
         let feedback_sample =
-            clamp_to_bit_depth(inp + delayed * self.feedback[channel], self.bit_depth);
+            clamp_to_bit_depth(
+                inp + delayed * self.feedback[channel], 
+                self.bit_depth
+            );
         self.lines[channel].write_and_advance(feedback_sample);
-        clamp_to_bit_depth(output, self.bit_depth) as i32
+        let wet = clamp_to_bit_depth(output, self.bit_depth) as i32;
+        mixer(wet, input, self.mix[channel])
     }
 }
 
@@ -128,65 +127,60 @@ impl Processor for Delay {
             frame[1] = r;
         }
     }
-    fn parameters(&self) -> &[ParameterInfo]{
+    fn parameters(
+        &self
+    ) -> &[ParameterInfo]{
         &DELAY_PARAMETERS
     }
-    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
-        match id {
-            ParameterId::DelayTimeLeft => Some(self.lines[0].len() / self.sample_rate * 1000.0),
-            ParameterId::DelayTimeRight => Some(self.lines[1].len() / self.sample_rate * 1000.0),
-            ParameterId::FeedbackLeft => Some(self.feedback[0]),
-            ParameterId::FeedbackRight => Some(self.feedback[1]),
-            ParameterId::MixLeft => Some(self.mix[0]),
-            ParameterId::MixRight => Some(self.mix[1]),
-            _ => None,
+    fn get_parameter(&self, address: ParameterAddress) -> Result<Option<f64>, ParameterError> {
+        let channel = validate_has_channels(address)?; // propagate InvalidTarget
+
+        match address.id {
+            ParameterId::DelayTime => {
+                validate_channel_exists(self.lines.len(), channel)?; // propagate ChannelOutOfRange
+                Ok(Some(self.lines[channel].len() / self.sample_rate * 1000.0))
+            }
+            ParameterId::Feedback => {
+                validate_channel_exists(self.feedback.len(), channel)?;
+                Ok(Some(self.feedback[channel]))
+            }
+            ParameterId::Mix => {
+                validate_channel_exists(self.mix.len(), channel)?;
+                Ok(Some(self.mix[channel]))
+            }
+            _ => Ok(None), // parameter not supported by this processor
         }
-    }
+}
 
     fn set_parameter(
         &mut self,
-        id: ParameterId,
+        address: ParameterAddress,
         value: f64,
     ) -> Result<(), ParameterError> {
-        match id {
-            ParameterId::DelayTimeLeft => {
+
+        let channel = validate_has_channels(address)?; // propagate InvalidTarget
+
+        match address.id {
+            ParameterId::DelayTime => {
                 let info: &ParameterInfo = &DELAY_PARAMETERS[0];
-                validate_parameter(id, value, info)?;
-                self.lines[0] = DelayLine::new((self.sample_rate * value / 1000.0) as usize);
+                validate_parameter(address.id, value, info)?;
+                self.lines[channel] = DelayLine::new((self.sample_rate * value / 1000.0) as usize);
                 Ok(())
             }
-            ParameterId::DelayTimeRight => {
+            ParameterId::Feedback => {
                 let info: &ParameterInfo = &DELAY_PARAMETERS[1];
-                validate_parameter(id, value, info)?;
-                self.lines[1] = DelayLine::new((self.sample_rate * value / 1000.0) as usize);
+                validate_parameter(address.id, value, info)?;
+                self.feedback[channel] = value;
                 Ok(())
             }
-            ParameterId::FeedbackLeft => {
+            ParameterId::Mix => {
                 let info: &ParameterInfo = &DELAY_PARAMETERS[2];
-                validate_parameter(id, value, info)?;
-                self.feedback[0] = value;
-                Ok(())
-            }
-            ParameterId::FeedbackRight => {
-                let info: &ParameterInfo = &DELAY_PARAMETERS[3];   
-                validate_parameter(id, value, info)?;
-                self.feedback[1] = value;
-                Ok(())
-            }
-            ParameterId::MixLeft => {
-                let info: &ParameterInfo = &DELAY_PARAMETERS[4];
-                validate_parameter(id, value, info)?;
-                self.mix[0] = value;
-                Ok(())
-            }
-            ParameterId::MixRight => {
-                let info: &ParameterInfo = &DELAY_PARAMETERS[5];
-                validate_parameter(id, value, info)?;
-                self.mix[1] = value;
+                validate_parameter(address.id, value, info)?;
+                self.mix[channel] = value;
                 Ok(())
             }
             _ => Err(
-                ParameterError::UnknownParameter(id),
+                ParameterError::UnknownParameter(address.id),
             ),
         }
     }

@@ -1,4 +1,4 @@
-use crate::parameter::{ParameterError, ParameterId, ParameterInfo};
+use crate::parameter::{ParameterAddress, ParameterError, ParameterId, ParameterInfo, ParameterScope};
 use crate::processor::Processor;
 use crate::utility::mixer;
 use rand::RngExt;
@@ -10,6 +10,7 @@ const REVERB_PARAMETERS: [ParameterInfo; 3] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Spread,
@@ -17,6 +18,7 @@ const REVERB_PARAMETERS: [ParameterInfo; 3] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
     ParameterInfo {
         id: ParameterId::Feedback,
@@ -24,6 +26,7 @@ const REVERB_PARAMETERS: [ParameterInfo; 3] = [
         min: 0.0,
         max: 4.0,
         default: 1.0,
+        scope: ParameterScope::Global,
     },
 ];
 
@@ -49,9 +52,9 @@ impl ReverbLine {
     fn read(&self) -> f64 {
         self.buffer[self.position]
     }
-    fn size(&self) -> usize {
-        self.buffer.len()
-    }
+    // fn size(&self) -> usize {
+    //     self.buffer.len()
+    // }
     fn write_and_advance(&mut self, sample: f64) {
         self.buffer[self.position] = sample;
 
@@ -177,11 +180,11 @@ impl Processor for Reverb {
     fn parameters(&self) -> &[ParameterInfo]{
         &REVERB_PARAMETERS
     }
-    fn get_parameter(&self, id: ParameterId) -> Option<f64>{
-        Some(0.0)
+    fn get_parameter(&self, address: ParameterAddress) -> Result<Option<f64>, ParameterError>{
+        Ok(Some(0.0))
     }
 
-    fn set_parameter(&mut self, id: ParameterId, value: f64,) -> Result<(), ParameterError> {
+    fn set_parameter(&mut self, address: ParameterAddress, value: f64,) -> Result<(), ParameterError> {
         Ok(())
     }
 
