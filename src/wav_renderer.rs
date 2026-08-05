@@ -134,7 +134,7 @@ impl WavRenderer {
                 self.write_block(&mut tail_buffer)?;
 
                 self.tail.rendered_frames += frames_this_block;
-                println!("peak: {}", peak);
+                // println!("peak: {}", peak);
                 if peak <= self.tail.silence_level_threshold  {
                     self.tail.silent_frames_count += 1;
                 } else {

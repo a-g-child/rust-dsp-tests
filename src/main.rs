@@ -111,11 +111,12 @@ fn initialise_processors(
             1.0
         )?;
         let delay = Delay::new(
-            [100.0, 300.0], 
-            [0.85, 0.5], 
-            [1.0, 1.0],
+            vec![600.0, 500.0], 
+            vec![0.85, 0.5], 
+            vec![1.0, 1.0],
             spec.sample_rate as f64,
             smpl_rng,
+            spec.channels as usize,
 
         );
         let reverb: Reverb = Reverb::new(
@@ -126,20 +127,6 @@ fn initialise_processors(
             spec.sample_rate as f64,
         );
         Ok((delay, reverb, comp, gain, soft_clip, hard_clipper, fader))
-}
-
-fn process_chain(chain: &mut [Box<dyn Processor>], buffer: &mut [i32]) {
-    for processor in chain {
-        processor.process_buffer(buffer);
-    }
-}
-
-fn block_peak(buffer: &[i32]) -> i32 {
-    buffer
-        .iter()
-        .map(|sample| sample.saturating_abs())
-        .max()
-        .unwrap_or(0)
 }
 
 #[cfg(test)]

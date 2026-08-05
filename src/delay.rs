@@ -42,7 +42,7 @@ const DELAY_PARAMETERS: [ParameterInfo; 3] = [
         scope: ParameterScope::PerChannel,
     },
 ];
-
+#[derive(Debug)]
 struct DelayLine {
     buffer: Vec<f64>,
     position: usize,
@@ -71,35 +71,49 @@ impl DelayLine {
 }
 
 pub struct Delay {
-    lines: [DelayLine; 2],
-    feedback: [f64; 2],
-    mix: [f64; 2],
+    lines: Vec<DelayLine>,
+    feedback: Vec<f64>,
+    mix: Vec<f64>,
     bit_depth: SampleRange,
     sample_rate: f64,
+    channels: usize,
 }
 
 impl Delay {
     pub fn new(
-        time_ms: [f64; 2],
-        feedback: [f64; 2],
-        mix: [f64; 2],
+        time_ms: Vec<f64>,
+        feedback: Vec<f64>,
+        mix: Vec<f64>,
         sample_rate: f64,
         bit_depth: SampleRange,
+        channels: usize,
     ) -> Self {
+        if time_ms.len() < channels || feedback.len() < channels || mix.len() < channels {
+            panic!("Delay lines, feedback and mix must be at least the number of channels as channel number, any with more than will be ignored");
+        }
+        let mut lines: Vec<DelayLine> = Vec::new();
+        let mut fb = Vec::new();
+        let mut m = Vec::new();
+
+        for index in 0..channels{
+            lines.push(DelayLine::new((sample_rate * time_ms[index] / 1000.0) as usize));
+            // println!("building line< starting position: {}",lines[index].position);
+            fb.push(feedback[index]);
+            m.push(mix[index])
+        }
         Self {
-            lines: [
-                DelayLine::new((sample_rate * time_ms[0] / 1000.0) as usize),
-                DelayLine::new((sample_rate * time_ms[1] / 1000.0) as usize),
-            ],
-            feedback,
-            mix,
+            lines,
+            feedback: fb,
+            mix: m,
             bit_depth,
             sample_rate,
+            channels,
         }
     }
 
     fn process_channel(&mut self, channel: usize, input: i32) -> i32 {
         let inp: f64 = input as f64;
+        // println!("lines pos: {:?}", self.lines[channel].position);
         let delayed = self.lines[channel].read();
         let output = inp + delayed * self.mix[channel];
         let feedback_sample =
@@ -118,13 +132,15 @@ impl Processor for Delay {
         self.process_channel(0, sample)
     }
     fn process_buffer(&mut self, buffer: &mut [i32]) {
-        for frame in buffer.chunks_exact_mut(2) {
-            let left = frame[0];
-            let right = frame[1];
-            let l = self.process_channel(0, left);
-            let r = self.process_channel(1, right);
-            frame[0] = l;
-            frame[1] = r;
+        // Iterate over the buffer in chunks corresponding to the number of channels.
+        for frame in buffer.chunks_exact_mut(self.channels) {
+            // Process each channel within the current frame simultaneously.
+            for (index, frame_data) in frame.iter_mut().enumerate() {
+                // println!("working on channel: {}", index);
+                if index < self.channels {
+                   *frame_data =  self.process_channel(index, *frame_data);
+                }
+            }
         }
     }
     fn parameters(
@@ -150,7 +166,7 @@ impl Processor for Delay {
             }
             _ => Ok(None), // parameter not supported by this processor
         }
-}
+    }
 
     fn set_parameter(
         &mut self,

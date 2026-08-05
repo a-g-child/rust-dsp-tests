@@ -23,12 +23,6 @@ impl Gain {
     pub fn new(gain: f64, sample_range: SampleRange) -> Self {
         Self { gain, sample_range }
     }
-    pub fn gain(&self) -> f64 {
-        self.gain
-    }
-    pub fn set_gain(&mut self, new_value: f64) {
-        self.gain = new_value;
-    }
     pub fn apply_gain(&self, sample: i32, gain: f64) -> i32 {
         let scaled: f64 = (sample as f64) * gain;
         scaled
